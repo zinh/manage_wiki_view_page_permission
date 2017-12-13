@@ -1,0 +1,22 @@
+<%
+  wiki_content = content.text
+  if !User.current.allowed_to?(:view_protected_pages, @project)
+    captures = wiki_content.scan(/\[\[(?<wiki_name>.+)\]\]/).flatten
+    wiki_page_titles = captures.each_with_index.each_with_object({}) do |(capture, index), h|
+      normalized_title = capture.gsub(/[^A-Za-z_ ]/,'').capitalize.gsub(' ', '_')
+      h[normalized_title] ||= []
+      h[normalized_title] << captures[index]
+    end
+    WikiPage.where(title: wiki_page_titles.keys, protected: true).pluck(:title).each do |wiki_title|
+      wiki_page_titles[wiki_title].each do |protected_title|
+        wiki_content.gsub!("[[#{protected_title}]]", '')
+      end
+    end if wiki_page_titles.present?
+  end
+  content.text = wiki_content
+%>
+
+<div class="wiki wiki-page">
+  <%= textilizable content, :text, :attachments => content.page.attachments,
+        :edit_section_links => (@sections_editable && {:controller => 'wiki', :action => 'edit', :project_id => @page.project, :id => @page.title}) %>
+</div>
